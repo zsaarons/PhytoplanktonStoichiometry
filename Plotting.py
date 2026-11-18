@@ -11,6 +11,8 @@ from matplotlib.cm import ScalarMappable
 import seaborn as sns
 from sklearn.metrics import root_mean_squared_error
 from matplotlib.legend_handler import HandlerTuple
+from matplotlib.ticker import MultipleLocator
+from matplotlib.markers import MarkerStyle
 import ApplyModel
 import CellModel
 from pathlib import Path
@@ -53,18 +55,18 @@ def figset():
                  'figure.dpi': 600,
                  'text.latex.preamble': r'\usepackage[greek,english]{babel}',
                  'text.latex.preamble': r'\usepackage{amsmath}',
-                 "mathtext.fontset" : "stix"})
+                 'mathtext.fontset' : 'stix'})
     return None
 
 
 def saveFig(fig, fileName):
-    """Save figure as png file"""
+    """Save figure as pdf file"""
     # Check that output folder exists and build if not
     Path(CellModel.RootFolder/FigFolder).mkdir(parents=True,
                                                exist_ok=True)
     
     # Save figure and clear
-    plt.savefig('%s/%s'%(CellModel.RootFolder/FigFolder,fileName))
+    plt.savefig('%s/%s.pdf'%(CellModel.RootFolder/FigFolder,fileName),format='pdf')
     fig.clf()
     return None
 
@@ -111,11 +113,20 @@ def LabelSubplot(axes, xcoord=-0.1, ycoord=1.02, titles=None):
     return axes
 
 
-def LegendContents(axes, labels, loc, cols=1, new_l=[], new_h=[]):
+def LegendContents(axes, labels, loc, cols=1, new_l=[], new_h=[], leg_title=None):
     """Create legend from dictionary of label and handle options"""
     # Dictionary with options for legends and handles
-    LegDict = {'Phylum:': plt.plot([],marker='', ls='')[0],
-               '': plt.plot([],marker='', ls='')[0], # Empty line
+    culture_pal = ["#F5AF4D","#DB4743","#5495CF"] # Badlands from https://github.com/katiejolly/nationalparkcolors/tree/master
+    LegDict = {'': plt.plot([],marker='', ls='')[0], # Empty line
+               'Batch': plt.Line2D([],[],marker='o',markeredgewidth=0.32,
+                                   markeredgecolor='k',markerfacecolor=culture_pal[0],
+                                   linestyle='None'),
+               'Semi-continuous': plt.Line2D([],[],marker='o',markeredgewidth=0.32,
+                                             markeredgecolor='k', markerfacecolor=culture_pal[1],
+                                             linestyle='None'),
+               'Chemostat': plt.Line2D([],[],marker='o',markeredgewidth=0.32,
+                                       markeredgecolor='k',markerfacecolor=culture_pal[2],
+                                       linestyle='None'),
                'Healey, 1985 data': plt.Line2D([],[],marker='D',linestyle='None',
                                                markeredgewidth=0.32,c='k'),
                'Regression': plt.Line2D([],[],linestyle='dashed',c='k'),
@@ -125,11 +136,18 @@ def LegendContents(axes, labels, loc, cols=1, new_l=[], new_h=[]):
                'Mean ratio': plt.Line2D([],[],linestyle='dashdot',c='k'),
                'Model $\\mu_{max}$': plt.Line2D([],[],linestyle='dashed',c='k'),
                'Model stoichiometry': plt.Line2D([],[],c='k'),
-               r'Irradiance ($\mathrm{µE \; m^{-2} \; s^{-1}}$):': plt.plot([],marker='',
-                                                                            ls='')[0],
                'Redfield line': plt.Line2D([],[],linestyle='dashed',c='r'),
-               'Redfield star': (plt.Line2D([],[],marker='$\u2217$',ls='',c='r'),
-                                 plt.Line2D([],[],linestyle='dashed',c='r'))}
+               'Redfield star': (plt.Line2D([],[],marker='$\u2217$',ls='',c='r',
+                                            markersize=5, markeredgecolor='none'),
+                                 plt.Line2D([],[],marker='_',ls='',c='r',
+                                             markersize=4,markeredgewidth=1,
+                                             markeredgecolor='r'))}
+
+    titles = {'Phylum:':'  ','Culture system:':' ',
+              r'Irradiance ($\mathrm{µE \; m^{-2} \; s^{-1}}$):':''}
+    if labels[0] in titles:
+        leg_title = titles[labels[0]] + labels[0]
+        labels = labels[1:]
 
     for phylum, hex in ColorPalette_Phylum().items():
         LegDict[phylum] = plt.Line2D([],[],marker='o',markeredgewidth=0.32,
@@ -144,9 +162,9 @@ def LegendContents(axes, labels, loc, cols=1, new_l=[], new_h=[]):
 
     # Add legend to figure
     leg = axes.legend(h,l,loc='upper center',bbox_to_anchor=loc,frameon=False,
-                      ncol=cols,handler_map={tuple: HandlerTuple(ndivide=None)})
-    if 'Phylum:' in labels: leg.texts[0].set_position((-100, 0)) 
-    if r'Irradiance ($\mathrm{µE \; m^{-2} \; s^{-1}}$):' in labels: leg.texts[0].set_position((-150, 0)) 
+                      ncol=cols,handler_map={tuple: HandlerTuple(ndivide=None)},
+                      title=leg_title)
+    leg._legend_box.align = "left"
     return axes
 
 
@@ -221,46 +239,6 @@ def Histogram_ObservedCNP(axes, df, ratio):
     return axes
 
 
-def Histogram_ObservedCNP_V2(axes, df, ratio):
-    """Plot histogram of observed stoichiometry for each culture condition"""
-    # Figure variables
-    pal = sns.cubehelix_palette(3, rot=-.25, light=.65)
-    titles = ['Nutrient replete','N-limited','P-limited']
-
-    # Split data by culture condition and calculate outliers
-    dfs = [df[(df['Manipulation']==1)], df[(df['Manipulation']==2)],
-           df[(df['Manipulation']==3)]]
-    dfs_withOutliers = dfs.copy()
-    dfs = CalcOutliers(dfs_withOutliers, ratio)
-
-    # Loop through combinations of culture conditions and ratios
-    for i in range(len(dfs)):
-        for j in range(len(ratio)):
-            sns.histplot(data=dfs[i].dropna(subset=[ratio[j]]), x=ratio[j],
-                         stat='density', element="step", kde=True,
-                         color=pal[i], ax=axes[i,j]) # Plot histogram
-            # Add Redfield ratio line
-            Rf = Redfield[ratio[j][0]]/Redfield[ratio[j][1]]
-            if i==2: axes[i,j].axvline(Rf, ymin=0, ymax=3.56, color='r',
-                                       linestyle='dashed', clip_on=False)
-            # Add mean line (include outliers in calculating mean)
-            kdeline = axes[i,j].lines[0]
-            mean = dfs_withOutliers[i].dropna(subset=[ratio[j]])[ratio[j]].mean()
-            xs = kdeline.get_xdata(); ys = kdeline.get_ydata()
-            height = np.interp(mean, xs, ys)
-            axes[i,j].vlines(mean, 0, height, color='k', linestyle='dashdot',
-                             label='Mean ratio')
-
-            # Format axes  
-            axes[i,j].set(xlabel=r'$(\mathrm{mol \: %s}) \, (\mathrm{mol \: %s})^{-1}$'%(ratio[j][0],ratio[j][1]) if i==2 else None)       
-            if j==0: axes[i,j].text(-0.5, 0.5, titles[i], color=pal[i],
-                                    fontweight='bold', ha='center', va='center',
-                                    rotation='vertical', transform=axes[i,j].transAxes)
-            if j>0: axes[i,j].set(ylabel="")
-            if i<2: axes[i,j].axes.get_xaxis().set_visible(False)
-    return axes
-
-
 def PlotRegression(axes, type, df, varx, vary, xlim, r_loc):
     """Plot regression line (and statistic) for given variables"""
     # Range to calculate regression fit over
@@ -277,7 +255,7 @@ def PlotRegression(axes, type, df, varx, vary, xlim, r_loc):
               label='%s regression'%(type))
     
     # Annotate with relevant statistic
-    r_stat = 'r' if varx == 'Specific.growth' else '$R^2$'
+    r_stat = '$r$' if varx == 'Specific.growth' else '$R^2$'
     n = 1 if varx == 'Specific.growth' else 2
     if r_loc != None:
         axes.text(r_loc[0], r_loc[1], f"{r_stat}: {r**n:.2f}", fontsize=10,
@@ -289,7 +267,7 @@ def PlotRegression(axes, type, df, varx, vary, xlim, r_loc):
 def Scatterplot_GrowthVsStoich(axes, df, ratio, hue_col, regression=None,
                                Rf_ratio=True, cbar_min=None):
     """Scatterplot of growth rate vs given stoichiometric ratio"""
-    # Palette for plotting (either phylum or irradiance)
+    # Palette for plotting (either phylum, irradiance, or culture type)
     if hue_col == 'Phylum_Plotting':
         pal = ColorPalette_Phylum()
     elif hue_col == 'Irrad.':
@@ -298,6 +276,8 @@ def Scatterplot_GrowthVsStoich(axes, df, ratio, hue_col, regression=None,
         pal = sns.color_palette("magma", as_cmap=True)
         hnorm = LogNorm(df['I_norm'].min() if cbar_min==None else cbar_min,
                         df['I_norm'].max())
+    elif hue_col == 'Growth.conditions':
+            pal = ["#F5AF4D","#DB4743","#5495CF"]
 
     # Plot growth rate vs ratio
     sns.scatterplot(data=df, x='Specific.growth', y=ratio,hue=hue_col,
@@ -307,12 +287,12 @@ def Scatterplot_GrowthVsStoich(axes, df, ratio, hue_col, regression=None,
     
     # Axes limits
     xlim = [df['Specific.growth'].min()-0.06,
-            round(1.05 * df['Specific.growth'].max())] #ADJUST AS NEEDED FOR DIFF FIGURES
-    axes.set_xlim(left=xlim[0], right=xlim[1]) #ADJUST AS NEEDED FOR DIFF FIGURES
-    axes.set_ylim(bottom=0, top=df[ratio].max()*1.05) #ADJUST AS NEEDED FOR DIFF FIGURES
+            round(1.05 * df['Specific.growth'].max())]
+    axes.set_xlim(left=xlim[0], right=xlim[1])
+    axes.set_ylim(bottom=0, top=df[ratio].max()*1.05)
 
     # Plot regression as specified by inputs
-    r_loc = (0.7, 0.2) if regression=='Linear' else None #ADJUST X,Y AS NEEDED FOR DIFF FIGURES
+    r_loc = (0.7, 0.2) if regression=='Linear' else None
     if regression != None: PlotRegression(axes, regression, df, 'Specific.growth',
                                            ratio, xlim, r_loc)
 
@@ -328,11 +308,18 @@ def Scatterplot_GrowthVsStoich(axes, df, ratio, hue_col, regression=None,
     return axes
 
 
-def Scatterplot_ObsVsModelStoich(axes, df, ratio, rmse_loc, r2_loc=(0.7, 0.3), axes_max=None):
+def Scatterplot_ObsVsModelStoich(axes, df, ratio, hue_col, rmse_loc, 
+                                 r2_loc=(0.7, 0.3), axes_max=None):
     """Scatterplot of observed vs model values for given stoichiometric ratio"""
+    # Palette for plotting (either phylum or irradiance)
+    if hue_col == 'Phylum_Plotting':
+        pal = ColorPalette_Phylum()
+    elif hue_col == 'Growth.conditions':
+        pal = ["#F5AF4D","#DB4743","#5495CF"]
+
     # Plot stoichiometry
-    sns.scatterplot(data=df, x=ratio, y='Mod_%s'%(ratio), hue='Phylum_Plotting',
-                    palette=ColorPalette_Phylum(), edgecolor='k', style='Marker',
+    sns.scatterplot(data=df, x=ratio, y='Mod_%s'%(ratio), hue=hue_col,
+                    palette=pal, edgecolor='k', style='Marker',
                     markers={1:'o',2:'D'}, legend=False, ax=axes)
     
     # Plot 1:1 line between observed and model stoichiometry
@@ -343,19 +330,28 @@ def Scatterplot_ObsVsModelStoich(axes, df, ratio, rmse_loc, r2_loc=(0.7, 0.3), a
     axes.text(rmse_loc[0], rmse_loc[1], f"$RMSE$: {rmse:.3f}", fontsize=10,
                  ha="left", va="bottom", transform=axes.transAxes)
     
-    # Axes limits
-    max = np.max([df[ratio].max(),df['Mod_%s'%ratio].max()]) if axes_max==None else axes_max
-    axes.set_xlim(left=0, right=max*1.05)
-    axes.set_ylim(bottom=0, top=max*1.05)
+    # Axes limites and tick marks
+    max_val = np.max([df[ratio].max(),df['Mod_%s'%ratio].max()]) if axes_max==None else axes_max
+    axes.set_xlim(left=0, right=max_val*1.05)
+    axes.set_ylim(bottom=0, top=max_val*1.05)
+    tick_scale = 0.1 if ratio=='NC' else 0.02 if max_val>0.05 else 0.01
+    axes.xaxis.set_major_locator(MultipleLocator(tick_scale))
+    axes.yaxis.set_major_locator(MultipleLocator(tick_scale))
 
     # Plot linear regression and R2 value
-    PlotRegression(axes, 'Linear', df, ratio, 'Mod_%s'%ratio, [0, max*1.05],
-                   r2_loc) #ADJUST X,Y AS NEEDED FOR DIFF FIGURES)
+    PlotRegression(axes, 'Linear', df, ratio, 'Mod_%s'%ratio, [0, max_val*1.05],
+                   r2_loc)
     
     # Add markers for Redfield Ratio
     Rf = Redfield[ratio[0]]/Redfield[ratio[1]]
-    axes.text(0, Rf, '$\u2217$-', color='r', ha='right', va='center')
-    axes.text(Rf, 0, '-$\u2217$', color='r', rotation=270, ha='center', va='top')
+    axes.plot([Rf, Rf], [x*max_val for x in [-0.005,-0.02]], color='r',
+              linewidth=0.8, clip_on=False)
+    axes.plot(Rf, -0.051*max_val, marker=MarkerStyle('$\u2217$').rotated(deg=270),
+              color='r', markersize=5,markeredgecolor='none',clip_on=False)
+    axes.plot([x*max_val for x in [-0.005,-0.02]], [Rf, Rf], color='r',
+              linewidth=0.8, clip_on=False)
+    axes.plot(-0.051*max_val, Rf, marker='$\u2217$', color='r', markersize=5,
+              markeredgecolor='none', clip_on=False)
 
     # Axes labels
     lab = r'$(\mathrm{mol \; %s}) \: (\mathrm{mol \; %s})^{-1}$'%(ratio[0],ratio[1])
@@ -475,7 +471,11 @@ def Healey_ModelFit(axes, df, ratio):
     
     # Add marker for Redfield Ratio
     Rf = Redfield[ratio[0]]/Redfield[ratio[1]]
-    axes.text(0, Rf, '$\u2217$-', color='r', ha='right', va='center')
+    axes.plot([-0.002, -0.021], [Rf, Rf], transform=axes.get_yaxis_transform(),
+              color='r', linewidth=0.8, clip_on=False)
+    axes.plot(-0.045, Rf, marker='$\u2217$', color='r', markersize=4.5,
+              markeredgecolor='none', transform=axes.get_yaxis_transform(),
+              clip_on=False)
     
     # Axes limits
     axes.autoscale()

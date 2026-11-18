@@ -1,5 +1,5 @@
 """
-Produce tables used in main text and supporting information
+Produce tables used in main text and supporting information as .tex files
 """
 
 # Import packages
@@ -36,46 +36,25 @@ def Table1_StoichDatabase(df,save):
     """
     # Remove rows that do not contain any of N:C, P:C, or N:P
     df = df.copy().dropna(subset=['NC','PC','NP'],how='all')
+    data_filter = ['Phylum','NC','PC','NP']
+    col = ['Nutrient Manipulation','All Data','Contains N:C','Contains P:C','Contains N:P']
+    manip = ['N-Limited','P-Limited','Nutrient Replete','Total']; manip_num = [2,3,1]
 
-    df['Phylum_Condensed'] = df['Phylum']
-    df.loc[df['Phylum'].isin(['Cryptophyta','Euglenozoa','Ochrophyta',
-                              'Rhodophyta','Chlorarachniophyta','Glaucophyta']),
-                              'Phylum_Condensed'] = 'Other'
-    PFT = np.sort(df['Phylum_Condensed'].unique())
-
-    data_filter = ['','NC','PC','NP']
-    data_subset = ['All Data','Contains N:C','Contains P:C','Contains N:P']
-    manip = ['Nutrient Replete','N-Limited','P-Limited']
-
-    col = pd.MultiIndex.from_arrays([['','', *['\\it{Phylum}']*len(PFT)],
-                                     ['Studies','Data Points',*PFT]])
-    idx = ['\\rule{0pt}{2ex} \\it{Nutrient Replete}',*['\\quad %s'%j for j in data_subset],
-           '\\noalign{\\vspace{0.25ex}} \\cline{1-9} \\rule{0pt}{2.6ex} \\it{N-Limited}',*['\\quad %s'%j for j in data_subset],
-           '\\noalign{\\vspace{0.25ex}} \\cline{1-9} \\rule{0pt}{2.6ex} \\it{P-Limited}',*['\\quad %s'%j for j in data_subset],
-           '\\noalign{\\vspace{0.25ex}} \\cline{1-9} \\rule{0pt}{2.6ex} \\it{Total}']
-               
     # Extract data for table
     rows = []
     for i in range(len(manip)): # For each nutrient manipulation
-        rows.append([*['']*(len(PFT)+2)])
-        df_manip = df[(df['Manipulation'] == i+1)]
-        for j in range(len(data_filter)): # Containing given stoichiometric ratio
-            df_filter = df_manip.dropna(subset=[data_filter[j]]) if j > 0 else df_manip
-            row = [len(df_filter['Ref.'].unique()),len(df_filter),
-                   *[len(df_filter[(df_filter['Phylum_Condensed'] == k)]) for k in PFT]]
-            rows.append(row)
-    rows.append([len(df['Ref.'].unique()),len(df),
-                   *[len(df[(df['Phylum_Condensed'] == k)]) for k in PFT]])
+        df_manip = df[(df['Manipulation'] == manip_num[i])] if i<3 else df
+        data_pts = ['{:d} ({:d})'.format(len(df_manip.dropna(subset=[data_filter[j]])),len(df_manip.dropna(subset=[data_filter[j]])['Ref.'].unique())) for j in range(4)]
+        rows.append([manip[i],*data_pts])
 
     # Compile data
-    table = pd.DataFrame(rows,columns=col,index=idx).style
-    tex = table.to_latex(caption='Summary of stoichiometric data compilation from literature.',
-                          column_format='@{}lrrrrrrrr',
-                          multicol_align="c",
-                          position='H',
-                          hrules=True).replace('& Studies','\\cmidrule{4-9} & Studies')
-    tex = tex.replace("\\begin{tabular}", "\\small \\begin{tabular}").replace("\\begin{table}[H]", "\\begin{sidewaystable}").replace("\\end{table}", "\\end{sidewaystable}").replace("\\begin{tabular}", "\\footnotesize \\begin{tabular}")
-    if save==True: saveTable(tex,'StoichiometryDatabase_Summary')
+    table = pd.DataFrame(rows,columns=col).style.hide(level=0, axis=0)
+    tex = table.to_latex(caption='Summary of data points (studies) in stoichiometric data compilation.',
+                         column_format='lcccc',
+                         position='H',
+                         hrules=True)
+    tex = tex.replace("\\begin{tabular}", "\\small \\begin{tabular}")
+    if save==True: saveTable(tex,'Table1_StoichiometryDatabase')
     #display(table)
     return None
 
@@ -113,7 +92,7 @@ def Table2_MeanStoich(df,save):
                          position='H',
                          hrules=True)
     tex = tex.replace("\\begin{tabular}", "\\small \\begin{tabular}")
-    if save==True: saveTable(tex,'MeanObservedStoich')
+    if save==True: saveTable(tex,'Table2_MeanObservedStoich')
     #display(table)
     return None
 
@@ -122,7 +101,55 @@ def Table2_MeanStoich(df,save):
 #  Supporting Information
 ####################################
 
-def TableS1_ModelConstants(save):
+def TableS1_StoichDatabasePhylum(df,save):
+    """
+    Produce Table S1: Summary of database contents by phylum
+    """
+    # Remove rows that do not contain any of N:C, P:C, or N:P
+    df = df.copy().dropna(subset=['NC','PC','NP'],how='all')
+
+    df['Phylum_Condensed'] = df['Phylum']
+    df.loc[df['Phylum'].isin(['Cryptophyta','Euglenozoa','Ochrophyta',
+                              'Rhodophyta','Chlorarachniophyta','Glaucophyta']),
+                              'Phylum_Condensed'] = 'Other'
+    PFT = np.sort(df['Phylum_Condensed'].unique())
+
+    data_filter = ['','NC','PC','NP']
+    data_subset = ['All Data','Contains N:C','Contains P:C','Contains N:P']
+    manip = ['Nutrient Replete','N-Limited','P-Limited']
+
+    col = pd.MultiIndex.from_arrays([[ *['\\it{Phylum}']*len(PFT)],[*PFT]])
+    idx = ['\\rule{0pt}{2ex} \\it{Nutrient Replete}',*['\\quad %s'%j for j in data_subset],
+           '\\noalign{\\vspace{0.25ex}} \\cline{1-7} \\rule{0pt}{2.6ex} \\it{N-Limited}',*['\\quad %s'%j for j in data_subset],
+           '\\noalign{\\vspace{0.25ex}} \\cline{1-7} \\rule{0pt}{2.6ex} \\it{P-Limited}',*['\\quad %s'%j for j in data_subset],
+           '\\noalign{\\vspace{0.25ex}} \\cline{1-7} \\rule{0pt}{2.6ex} \\it{Total}']
+               
+    # Extract data for table
+    rows = []
+    for i in range(len(manip)): # For each nutrient manipulation
+        rows.append([*['']*(len(PFT))])
+        df_manip = df[(df['Manipulation'] == i+1)]
+        for j in range(len(data_filter)): # Containing given stoichiometric ratio
+            df_filter = df_manip.dropna(subset=[data_filter[j]]) if j > 0 else df_manip
+            taxa = ['{:d} ({:d})'.format(len(df_filter[(df_filter['Phylum_Condensed'] == k)]),len(df_filter[(df_filter['Phylum_Condensed'] == k)]['Ref.'].unique())) for k in PFT]
+            rows.append(taxa)
+    #rows.append([len(df[(df['Phylum_Condensed'] == k)]) for k in PFT])
+    rows.append(['{:d} ({:d})'.format(len(df[(df['Phylum_Condensed'] == k)]),len(df[(df['Phylum_Condensed'] == k)]['Ref.'].unique())) for k in PFT])
+    
+    # Compile data
+    table = pd.DataFrame(rows,columns=col,index=idx).style
+    tex = table.to_latex(caption='Number of data points (studies) by phylum in stoichiometric data compilation.',
+                          column_format='@{}lcccccc',
+                          multicol_align="c",
+                          position='H',
+                          hrules=True).replace('& Studies','\\cmidrule{2-7} & Studies')
+    tex = tex.replace("\\begin{tabular}", "\\small \\begin{tabular}").replace("\\begin{table}[H]", "\\begin{sidewaystable}").replace("\\end{table}", "\\end{sidewaystable}")
+    if save==True: saveTable(tex,'TableS1_StoichiometryDatabase_PhylumSummary')
+    #display(table)
+    return None
+
+
+def TableS2_ModelConstants(save):
     """
     Produce Table S1: Values for fixed model parameters
     """
@@ -155,26 +182,26 @@ def TableS1_ModelConstants(save):
                          hrules=True)
     tex = re.sub(r'(\d.\d{2})E(-?\+?\d{2})', r'\\num{\1d\2}', tex)
     tex = re.sub(r'(& \\)', r'& \\;\\', tex)
-    if save==True: saveTable(tex,'ModelParamTable_Constants')
+    if save==True: saveTable(tex,'TableS2_ModelParamTable_Constants')
     #display(table)
     return None
 
 
-def TableS2_ModelFitOptions(save):
+def TableS3_ModelFitOptions(save):
     """
     Produce Table S2: Values for model parameters fit to 3 datasets (Healey
     1985 study; all nutrient replete data in compilation; all nutrient replete
     data excluding cultures of Cyanobacteria)
     """
     # Get data and compile table
-    param_unit = {r'$m$': r'd\textsuperscript{-1}',
-                  r'$A_I$': r'$\frac{\text{mol C (mol C in Chl)\textsuperscript{-1} d\textsuperscript{-1}}}{\text{{\unit{\umol}} m\textsuperscript{-2} s\textsuperscript{-1}}}$',
+    param_unit = {r'$A_I$': r'$\frac{\text{mol C (mol C in Chl)\textsuperscript{-1} d\textsuperscript{-1}}}{\text{{\unit{\umol}} m\textsuperscript{-2} s\textsuperscript{-1}}}$',
                   r'$P_{max}$': r'mol C (mol C in Chl)\textsuperscript{-1} d\textsuperscript{-1}',
+                  r'$m$': r'd\textsuperscript{-1}',
+                  r'$A_{Bio}$': r'mol C mol C\textsuperscript{-1}',
                   r'$A_{Pho}$': r'mol C (mol C in Chl)\textsuperscript{-1}',
                   r'$A_{Pho}^{P:Chl}$': r'mol P (mol C in Chl)\textsuperscript{-1}',
-                  r'$A_{Bio}$': r'mol C mol C\textsuperscript{-1}',
-                  r'$Q_{C}^{Pro-Other}$': r'mol C mol C\textsuperscript{-1}',
                   r'$Q_{C}^{Other0}$': r'mol C mol C\textsuperscript{-1}',
+                  r'$Q_{C}^{Pro-Other}$': r'mol C mol C\textsuperscript{-1}',
                   r'$Q_{P}^{Other0}$': r'mol P mol C\textsuperscript{-1}'}
     
     params = pd.DataFrame({'Parameter': param_unit.keys(),
@@ -185,13 +212,10 @@ def TableS2_ModelFitOptions(save):
     
     # Remove because cant get actual value (derived from calculations of in u_max,
     # which requires nutrient replete data)
-    params.loc[8,'Nutrient-limited'] = float(-1)
-    params.loc[8,'No Cyano'] = float(-1)
-
-    # Swap order of rows for photosynthesis parameters
-    params['order'] = range(1,len(params)+1)
-    params.loc[params.index==0,'order'] = 0; params.loc[params.index==2,'order'] = 1
-    params = params.sort_values('order').drop('order', axis=1)
+    params.loc[6,'Nutrient-limited'] = float(-1)
+    params.loc[6,'No Cyano'] = float(-1)
+    # Swap order of rows
+    params = params.reindex([1,0,2,4,5,3,7,8,6])
 
     # Style and convert to latex
     table = params.style.format({'Healey, 1985':'{:.2E}',
@@ -205,12 +229,12 @@ def TableS2_ModelFitOptions(save):
     tex = re.sub(r'(\n\$.*?&\s)(.*?&\s)(.*?&\s)', r'\1\, \2\\quad\:\3\;', tex)
     tex = re.sub(r'(&\s)([^\d]*?)(--.*?&\s)([^\d]*?)(--)',
                  r'\1\\qquad\\quad \3\\qquad \5', tex)
-    if save==True: saveTable(tex,'ModelParamTable_FitOpt')
+    if save==True: saveTable(tex,'TableS3_ModelParamTable_FitOpt')
     #display(table)
     return None
 
 
-def TableS3_OptimalGrowthCN(df,save):
+def TableS4_OptimalGrowthCN(df,save):
     """
     Produce Table S3: Model prediction of maximum growth rate and C:N ratio in
     nutrient replete cultures with given temperature, day length, and cell size
@@ -231,16 +255,59 @@ def TableS3_OptimalGrowthCN(df,save):
                          position='H',
                          hrules=True)
     tex = tex.replace("\\begin{tabular}", "\\small \\begin{tabular}")
-    if save==True: saveTable(tex,'OptimalGrowthCN')
+    if save==True: saveTable(tex,'TableS4_OptimalGrowthCN')
+    #display(table)
+    return None
+
+
+def TableS5_StoichDatabase_CultureType(df,save):
+    """
+    Produce Table: Summary of culture types in database
+    """
+    # Remove rows that do not contain any of N:C, P:C, or N:P
+    df = df.copy().dropna(subset=['NC','PC','NP'],how='all')
+
+    data_filter = ['','NC','PC','NP']
+    data_subset = ['All Data','Contains N:C','Contains P:C','Contains N:P']
+    manip = ['Nutrient Replete','N-Limited','P-Limited']
+
+    col = pd.MultiIndex.from_arrays([[ *['\\it{Culture System}']*4],
+                                     [r'\;Batch\;',r'\;Semi-Continuous\;',r'\;Chemostat\;',r'\;Turbidostat\;']])
+    idx = ['\\rule{0pt}{2ex} \\it{Nutrient Replete \\quad\\;}',*['\\quad %s'%j for j in data_subset],
+           '\\noalign{\\vspace{0.25ex}} \\cline{1-5} \\rule{0pt}{2.6ex} \\it{N-Limited}',*['\\quad %s'%j for j in data_subset],
+           '\\noalign{\\vspace{0.25ex}} \\cline{1-5} \\rule{0pt}{2.6ex} \\it{P-Limited}',*['\\quad %s'%j for j in data_subset],
+           '\\noalign{\\vspace{0.25ex}} \\cline{1-5} \\rule{0pt}{2.6ex} \\it{Total}']
+               
+    # Extract data for table
+    rows = []
+    for i in range(len(manip)): # For each nutrient manipulation
+        rows.append([*['']*4])
+        df_manip = df[(df['Manipulation'] == i+1)]
+        for j in range(len(data_filter)): # Containing given stoichiometric ratio
+            df_filter = df_manip.dropna(subset=[data_filter[j]]) if j > 0 else df_manip
+            culture = ['{:d} ({:d})'.format(len(df_filter[(df_filter['Growth.conditions'] == k+1)]),len(df_filter[(df_filter['Growth.conditions'] == k+1)]['Ref.'].unique())) for k in range(4)]
+            rows.append(culture)
+    #rows.append([len(df[(df['Growth.conditions'] == k+1)]) for k in range(4)])
+    rows.append(['{:d} ({:d})'.format(len(df[(df['Growth.conditions'] == k+1)]),len(df[(df['Growth.conditions'] == k+1)]['Ref.'].unique())) for k in range(4)])
+
+    # Compile data
+    table = pd.DataFrame(rows,columns=col,index=idx).style
+    tex = table.to_latex(caption='Number of data points (studies) by culture system in stoichiometric \\\\data compilation.',
+                          column_format='@{}lcccc',
+                          multicol_align="c",
+                          position='H',
+                          hrules=True).replace('& Batch','\\cmidrule{2-5} & Batch')
+    tex = tex.replace("\\begin{tabular}", "\\small \\begin{tabular}")
+    if save==True: saveTable(tex,'TableS5_StoichiometryDatabase_CultureType')
     #display(table)
     return None
 
 
 ####################################
-# Run Figures
+# Run Tables
 ####################################
 
-def runTables(df,df_optimalCN,save=True):
+def runTables(save=True):
     """Produce and save tables in paper"""
     # Get model output/analysis
     df = ApplyModel.Model_df()
@@ -251,7 +318,9 @@ def runTables(df,df_optimalCN,save=True):
     Table2_MeanStoich(df,save)
 
     # Supporting Information
-    TableS1_ModelConstants(save)
-    TableS2_ModelFitOptions(save)
-    TableS3_OptimalGrowthCN(df_optimalCN,save)
+    TableS1_StoichDatabasePhylum(df,save)
+    TableS2_ModelConstants(save)
+    TableS3_ModelFitOptions(save)
+    TableS4_OptimalGrowthCN(df_optimalCN,save)
+    TableS5_StoichDatabase_CultureType(df,save)
     return None
