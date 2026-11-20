@@ -200,9 +200,9 @@ def TableS3_ModelFitOptions(save):
                   r'$A_{Bio}$': r'mol C mol C\textsuperscript{-1}',
                   r'$A_{Pho}$': r'mol C (mol C in Chl)\textsuperscript{-1}',
                   r'$A_{Pho}^{P:Chl}$': r'mol P (mol C in Chl)\textsuperscript{-1}',
-                  r'$Q_{C}^{Other0}$': r'mol C mol C\textsuperscript{-1}',
+                  r'$Q_{C}^{Other}$': r'mol C mol C\textsuperscript{-1}',
                   r'$Q_{C}^{Pro-Other}$': r'mol C mol C\textsuperscript{-1}',
-                  r'$Q_{P}^{Other0}$': r'mol P mol C\textsuperscript{-1}'}
+                  r'$Q_{P}^{Other}$': r'mol P mol C\textsuperscript{-1}'}
     
     params = pd.DataFrame({'Parameter': param_unit.keys(),
                            'Healey, 1985': ApplyModel.readParam('Healey')[0:9],
